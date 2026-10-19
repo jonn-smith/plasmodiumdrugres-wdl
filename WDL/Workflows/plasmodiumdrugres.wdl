@@ -29,6 +29,7 @@ workflow plasmodiumdrugres {
 
      File? targeted_reference
      File? genome_reference
+     File reference_fasta
 
      String mlaf_method = "naive"
      String naive_mlaf_method = "wsaf_prop"
@@ -59,7 +60,7 @@ workflow plasmodiumdrugres {
    call make_panel_bed.make_panel_bed {
         input:
         amplicon_info_tsv = amplicon_info_tsv,
-        reference_fasta = genome_reference
+        reference_fasta = reference_fasta
    }
 
     call convert_allele_table.convert_allele_table {

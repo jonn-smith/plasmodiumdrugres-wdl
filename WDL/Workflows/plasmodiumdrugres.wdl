@@ -10,6 +10,8 @@ import "../Subworkflows/merge_and_concat.wdl" as merge_and_concat_wf
 import "../Tasks/split_table_by_population_map/split_table_by_population_map.wdl" as split_table_by_population_map_t
 import "../Tasks/move_outputs/move_outputs.wdl" as move_outputs_t
 import "../Tasks/utils/fail.wdl" as fail_t
+import "../Tasks/create_panel_bed/create_panel_bed.wdl" as create_panel_bed
+import "../Tasks/convert_allele_table/convert_allele_table.wdl" as convert_allele_table
 
 workflow plasmodiumdrugres {
    input {
@@ -18,7 +20,7 @@ workflow plasmodiumdrugres {
      File? allele_table
 
      # Required for translation and for allele_table mode
-     File? panel_info_bed
+     #File? panel_info_bed
 
      File loci_of_interest_bed
      File loci_groups
@@ -38,11 +40,13 @@ workflow plasmodiumdrugres {
      String translate_loci_extra_args = ""
 
      String outdir = "output"
-     String docker_image = "plasmogenepi/plasmodiumdrugres:wdl"
+    String docker_image = "plasmogenepi/plasmodiumdrugres:wdl"
 
      # Optional: Terra workspace bucket id (e.g. fc-… from gs://fc-…/…). Use when Cromwell
      # localizes File paths and auto-detection from gs:// no longer applies.
      String? workspace_bucket
+
+     File amplicon_info_tsv
    }
 
    String outdir_sanitized = sub(outdir, "^[A-Za-z0-9_-]+$", "MATCH")
@@ -55,11 +59,23 @@ workflow plasmodiumdrugres {
      }
    }
 
+    # TODO ask Jess which reference should be used as input here
+   call create_panel_bed.create_panel_bed {
+        input:
+        amplicon_info_tsv = amplicon_info_tsv,
+        reference_fasta = targeted_reference,
+   }
+
+    call convert_allele_table.convert_allele_table {
+        input:
+            allele_table_tsv = allele_table
+    }
+
    call pipeline_initialisation_wf.pipeline_initialisation as t_001_init {
      input:
        pmo = pmo,
-       allele_table = allele_table,
-       panel_info_bed = panel_info_bed,
+       allele_table = convert_allele_table.converted_allele_table,
+       panel_info_bed = create_panel_bed.panel_bed,
        population_assignment = population_assignment,
        pmo_population_fields = pmo_population_fields,
        pmo_population_separator = pmo_population_separator,

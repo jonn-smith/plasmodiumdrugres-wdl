@@ -17,7 +17,7 @@ workflow plasmodiumdrugres {
    input {
      # Exactly one of these must be provided
      File? pmo
-     File? allele_table
+     File allele_table
 
      File loci_of_interest_bed
      File loci_groups

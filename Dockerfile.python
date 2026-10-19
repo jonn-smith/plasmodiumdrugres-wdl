@@ -1,0 +1,10 @@
+FROM python:3.12-slim
+
+LABEL org.opencontainers.image.title="mad4hatter-drugres/python-scripts"
+LABEL org.opencontainers.image.description="Lightweight image containing only the plasmodiumdrugres python helper scripts"
+
+# Scripts use only the python standard library, so no extra packages are installed
+COPY python/*.py /opt/python-scripts/
+RUN chmod +x /opt/python-scripts/*.py
+
+ENV PATH="/opt/python-scripts:$PATH"

@@ -52,10 +52,7 @@ WORKDIR /opt
 RUN git clone "$PMOTOOLS_GIT_URL" pmotools-python && \
     cd pmotools-python && \
     git checkout "$PMOTOOLS_REF"
-# Debian's apt-installed 'packaging' has no pip RECORD file, so pip can't upgrade it in place
-RUN pip install --break-system-packages --ignore-installed packaging && \
-    pip install --break-system-packages /opt/pmotools-python
-
+RUN pip install --break-system-packages /opt/pmotools-python
 # R configuration + packages
 RUN mkdir -p /usr/local/lib/R/etc/ /usr/lib/R/etc/ && \
     echo "options(repos = c(CRAN = 'https://cran.rstudio.com/'), download.file.method = 'libcurl', Ncpus = ${CPU_COUNT})" | tee /usr/local/lib/R/etc/Rprofile.site | tee /usr/lib/R/etc/Rprofile.site >/dev/null

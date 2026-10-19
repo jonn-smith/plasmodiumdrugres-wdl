@@ -56,11 +56,10 @@ workflow plasmodiumdrugres {
      }
    }
 
-    # TODO ask Jess which reference should be used as input here
    call make_panel_bed.make_panel_bed {
         input:
         amplicon_info_tsv = amplicon_info_tsv,
-        reference_fasta = targeted_reference,
+        reference_fasta = genome_reference
    }
 
     call convert_allele_table.convert_allele_table {

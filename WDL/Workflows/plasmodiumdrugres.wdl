@@ -12,6 +12,7 @@ import "../Tasks/move_outputs/move_outputs.wdl" as move_outputs_t
 import "../Tasks/utils/fail.wdl" as fail_t
 import "../Tasks/make_panel_bed/make_panel_bed.wdl" as make_panel_bed
 import "../Tasks/convert_allele_table/convert_allele_table.wdl" as convert_allele_table
+import "../Tasks/resmarkers_to_terra/resmarkers_to_terra.wdl" as resmarkers_to_terra
 
 workflow plasmodiumdrugres {
    input {
@@ -45,6 +46,9 @@ workflow plasmodiumdrugres {
 
      File amplicon_info_tsv
      File reference_fasta
+
+     String billing_project
+     String workspace_name
    }
 
    String outdir_sanitized = sub(outdir, "^[A-Za-z0-9_-]+$", "MATCH")
@@ -198,6 +202,13 @@ workflow plasmodiumdrugres {
        use_gcs_staging = move_use_gcs,
        fc_workspace_bucket = move_fc_bucket
    }
+
+   call resmarkers_to_terra.resmarkers_to_terra as resmarkers_to_terra {
+   input:
+      collapsed_amino_acid_calls = t_002_translate_loci.translate_loci_of_interest_output_collapsed_o,
+      billing_project = billing_project,
+      workspace_name = workspace_name
+     }
 
    output {
      String ml_summary = t_move_outputs.ml_summary_uri

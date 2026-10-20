@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the python-scripts-only image and push it to Artifact Registry.
-# Usage: scripts/build_and_push.sh [tag]   (default tag: short git SHA, or timestamp)
+# Usage: scripts/build_and_push_python_docker.sh [tag]   (default tag: short git SHA, or timestamp)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

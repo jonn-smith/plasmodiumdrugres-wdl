@@ -29,7 +29,6 @@ workflow plasmodiumdrugres {
 
      File? targeted_reference
      File? genome_reference
-     File reference_fasta
 
      String mlaf_method = "naive"
      String naive_mlaf_method = "wsaf_prop"
@@ -45,6 +44,7 @@ workflow plasmodiumdrugres {
      String? workspace_bucket
 
      File amplicon_info_tsv
+     File reference_fasta
    }
 
    String outdir_sanitized = sub(outdir, "^[A-Za-z0-9_-]+$", "MATCH")

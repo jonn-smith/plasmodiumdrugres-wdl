@@ -11,12 +11,13 @@ This document defines the **user-facing inputs and outputs** for the WDL impleme
 
 ## Inputs
 
-### Required: choose exactly one input mode
-
-Provide **exactly one** of:
+### Required
 
 - **`pmo`** (`File`): PMO JSON file.
-- **`allele_table`** (`File`): TSV/CSV containing microhaplotypes. When using this mode, `panel_info_bed` is also required.
+- **`allele_table`** (`File`): TSV/CSV containing microhaplotypes.
+- **`amplicon_info_tsv`** (`File`): Amplicon info TSV. Requires the following headers (`target_name`, `chrom`, 
+  `insert_start`, and `insert_end`.) 
+- **`reference_fasta`** (`File`): Reference FASTA of insert sequences, one record per target_name
 
 ### Required files
 

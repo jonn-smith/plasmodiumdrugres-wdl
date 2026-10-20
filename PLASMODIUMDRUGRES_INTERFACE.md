@@ -14,10 +14,12 @@ This document defines the **user-facing inputs and outputs** for the WDL impleme
 ### Required
 
 - **`pmo`** (`File`): PMO JSON file.
-- **`allele_table`** (`File`): TSV/CSV containing microhaplotypes.
-- **`amplicon_info_tsv`** (`File`): Amplicon info TSV. Requires the following headers (`target_name`, `chrom`, 
+- **`filtered_allele_data`** (`File`): TSV/CSV containing microhaplotypes.
+- **`amplicon_info`** (`File`): Amplicon info TSV. Requires the following headers (`target_name`, `chrom`, 
   `insert_start`, and `insert_end`.) 
-- **`reference_fasta`** (`File`): Reference FASTA of insert sequences, one record per target_name
+- **`reference`** (`File`): Reference FASTA of insert sequences, one record per target_name
+- **`billing_project`** (`String`): Terra billing project of the workspace to update (e.g. `my-billing-project`). Used by the final `resmarkers_to_terra` step.
+- **`workspace_name`** (`String`): Name of the Terra workspace whose `sample` table is updated (the workspace name only, not the `billing_project/workspace_name` pair). Used by the final `resmarkers_to_terra` step.
 
 ### Required files
 
@@ -93,6 +95,15 @@ Workflow output names (each value is a `gs://…` path to the file):
 - **`collapsed_amino_acid_calls`** → `collapsed_amino_acid_calls.tsv.gz`
 - **`loci_covered_by_target_samples_info`** → `loci_covered_by_target_samples_info.tsv`
 - **`loci_of_interest_for_target_for_microhap`** → `loci_of_interest_for_target_for_microhap.tsv.gz`
+
+### Terra `sample` table update
+
+As its last step, the workflow runs the `resmarkers_to_terra` task (`python/resmarkers_to_terra.py`). It takes the collapsed amino acid calls from `translate_loci_of_interest` and pivots them to one row per `specimen_name`, then upserts the rows into the **`sample`** data table of the workspace given by **`billing_project`** / **`workspace_name`**.
+
+- **`sample_id`** is the unique `specimen_name` from the collapsed calls.
+- One column per gene/position is added, named **`resmarker_<gene>_<aa_position>`** (e.g. `resmarker_dhfr-ts_164`), holding the `aa` value. If a specimen has several different `aa` values at the same gene/position (a mixed call), the distinct values are sorted and joined with `/` (e.g. `F/Y`). Specimens with no call at a position have that attribute unset.
+- The existing `sample` table is **not** deleted: rows with a matching `sample_id` are updated and other rows and columns are left unchanged.
+- This step produces no workflow output; the same table is also written to `sample_resmarkers.tsv` in the task's execution directory.
 
 Per-population merge artifacts and intermediate `translated_loci/` paths are still computed inside the run but are **not** listed as workflow outputs; use the staged URIs above for downloads and downstream tooling.
 

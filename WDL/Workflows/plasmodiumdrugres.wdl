@@ -18,7 +18,7 @@ workflow plasmodiumdrugres {
    input {
      # Exactly one of these must be provided
      File? pmo
-     File allele_table
+     File filtered_allele_data
 
      File loci_of_interest_bed
      File loci_groups
@@ -44,8 +44,8 @@ workflow plasmodiumdrugres {
      # localizes File paths and auto-detection from gs:// no longer applies.
      String? workspace_bucket
 
-     File amplicon_info_tsv
-     File reference_fasta
+     File amplicon_info
+     File reference
 
      String billing_project
      String workspace_name
@@ -63,13 +63,13 @@ workflow plasmodiumdrugres {
 
    call make_panel_bed.make_panel_bed {
         input:
-        amplicon_info_tsv = amplicon_info_tsv,
-        reference_fasta = reference_fasta
+        amplicon_info_tsv = amplicon_info,
+        reference_fasta = reference
    }
 
     call convert_allele_table.convert_allele_table {
         input:
-            allele_table_tsv = allele_table
+            allele_table_tsv = filtered_allele_data
     }
 
    call pipeline_initialisation_wf.pipeline_initialisation as t_001_init {

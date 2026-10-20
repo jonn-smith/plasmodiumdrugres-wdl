@@ -24,10 +24,6 @@ This document defines the **user-facing inputs and outputs** for the WDL impleme
 - **`loci_of_interest_bed`** (`File`): BED of loci of interest (single-locus estimates are computed at these loci).
 - **`loci_groups`** (`File`): TSV/CSV defining multi-locus groups (multi-locus estimates are computed for these groups).
 
-### Required iff using `allele_table`
-
-- **`panel_info_bed`** (`File`): BED defining panel target coordinates.
-
 ### Optional grouping / population splitting
 
 You can run either:

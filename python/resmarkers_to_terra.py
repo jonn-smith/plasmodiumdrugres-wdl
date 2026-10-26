@@ -15,6 +15,11 @@ The rows are then upserted into the Terra table named by --sample_table (default
 "sample"). The existing table is NOT deleted: rows with a matching row id are updated,
 other rows are left alone.
 
+specimen_name is matched against the row ids already in that table before upserting,
+because Terra row ids often carry a sequencer suffix (SRR26819135_S1_L001) that
+specimen_name lacks (SRR26819135). Upserting the unmatched name would silently create a
+second, half-empty row beside the real one instead of updating it.
+
 Requires `pyops-service-toolkit` (module name `ops_utils`) for the Terra upload, e.g.:
     pip install git+https://github.com/broadinstitute/pyops-service-toolkit.git
 """
@@ -75,6 +80,34 @@ def id_column_for(sample_table):
     return f"{sample_table}_id"
 
 
+def resolve_terra_ids(specimen_names, terra_ids):
+    """specimen_name -> the row id that already exists in the Terra table.
+
+    Terra row ids often carry a sequencer suffix (e.g. 'SRR26819135_S1_L001') that the
+    pipeline's specimen_name lacks. A name matches an id that equals it exactly, or that
+    is the name followed by '_S<digits>', optionally followed by '_L<digits>'. Names with
+    no match, or with more than one, are skipped and reported rather than guessed at, so
+    we never upsert a stray row next to the real one.
+
+    Ported from mad4hatter-wdl bin/write_metrics_to_sample_table.py, which solved this
+    same mismatch for the QC metrics.
+    """
+    resolved = {}
+    for name in sorted(specimen_names):
+        if name in terra_ids:
+            resolved[name] = name
+            continue
+        pattern = re.compile(rf"^{re.escape(name)}_S\d+(_L\d+)?$")
+        matches = sorted(terra_id for terra_id in terra_ids if pattern.match(terra_id))
+        if len(matches) == 1:
+            resolved[name] = matches[0]
+        elif matches:
+            logging.warning(f"'{name}' matches multiple Terra ids ({', '.join(matches)}); skipping.")
+        else:
+            logging.warning(f"no Terra id found for '{name}'; skipping.")
+    return resolved
+
+
 def pivot(path, id_column):
     """Return (rows, columns): one dict per specimen_name, and the sorted resmarker columns."""
     calls = {}  # sample_id -> column -> set of aa values
@@ -114,6 +147,22 @@ def upload_to_terra(rows, billing_project, workspace_name, sample_table, id_colu
         workspace_name=workspace_name,
         request_util=RunRequest(token=Token()),
     )
+
+    # Map specimen_name onto the row ids that already exist, so we update the real rows
+    # rather than creating suffix-less duplicates beside them.
+    terra_ids = {
+        entity["name"]
+        for entity in terra_workspace.get_gcp_workspace_metrics(entity_type=sample_table, verbose=False)
+    }
+    id_by_name = resolve_terra_ids({row[id_column] for row in rows}, terra_ids)
+    skipped = len(rows) - len(id_by_name)
+    rows = [{**row, id_column: id_by_name[row[id_column]]} for row in rows if row[id_column] in id_by_name]
+    if not rows:
+        sys.exit(f"ERROR: none of the specimen names matched a row id in the "
+                 f"'{sample_table}' table of {billing_project}/{workspace_name}; nothing uploaded.")
+    if skipped:
+        logging.warning(f"{skipped} specimen(s) had no matching row in '{sample_table}' and were skipped")
+
     # Upsert only: the existing table is intentionally left in place. Samples with no
     # call for a column simply don't have that attribute set.
     logging.info(f"Upserting {len(rows)} rows into Terra table '{sample_table}'")

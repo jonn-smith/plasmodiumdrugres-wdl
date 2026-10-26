@@ -22,7 +22,46 @@ CALLS = (
 )
 
 
+# The real row ids from the mad4hatter_sample table of
+# broad-firecloud-dsde-methods/JTS_COPY_20261024_..._Mad4Hatter_CLONE, where upserting
+# the bare specimen_name created five half-empty duplicate rows.
+REAL_TERRA_IDS = {
+    "SRR26819135_S1_L001", "SRR26819139_S2_L001", "SRR26819141_S3_L001",
+    "SRR26819151_S4_L001", "SRR26819200_S5_L001",
+}
+
+
+def test_resolve_terra_ids():
+    # the regression: a bare specimen_name must resolve onto the suffixed row id
+    resolved = r.resolve_terra_ids(
+        {"SRR26819135", "SRR26819139", "SRR26819141", "SRR26819151", "SRR26819200"},
+        REAL_TERRA_IDS)
+    assert resolved == {
+        "SRR26819135": "SRR26819135_S1_L001",
+        "SRR26819139": "SRR26819139_S2_L001",
+        "SRR26819141": "SRR26819141_S3_L001",
+        "SRR26819151": "SRR26819151_S4_L001",
+        "SRR26819200": "SRR26819200_S5_L001",
+    }, resolved
+
+    # an id that already matches exactly is used as-is
+    assert r.resolve_terra_ids({"SRR26819135_S1_L001"}, REAL_TERRA_IDS) == {
+        "SRR26819135_S1_L001": "SRR26819135_S1_L001"}
+
+    # lane-less suffix also matches
+    assert r.resolve_terra_ids({"S"}, {"S_S7"}) == {"S": "S_S7"}
+
+    # ambiguous and unmatched names are skipped, never guessed
+    assert r.resolve_terra_ids({"X"}, {"X_S1", "X_S2"}) == {}
+    assert r.resolve_terra_ids({"NOPE"}, REAL_TERRA_IDS) == {}
+
+    # a near-miss must NOT match: suffix has to be _S<digits>
+    assert r.resolve_terra_ids({"SRR26819135"}, {"SRR26819135_extra"}) == {}
+
+
 def main():
+    test_resolve_terra_ids()
+
     # Terra demands the row id column be named <table>_id; ops_utils raises otherwise.
     assert r.id_column_for("sample") == "sample_id"
     assert r.id_column_for("specimen") == "specimen_id"

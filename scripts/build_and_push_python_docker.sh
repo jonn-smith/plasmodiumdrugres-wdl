@@ -3,6 +3,7 @@
 # Usage: scripts/build_and_push_python_docker.sh [tag]   (default tag: short git SHA, or timestamp)
 set -euo pipefail
 
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 #IMAGE="us-central1-docker.pkg.dev/operations-portal-427515/mad4hatter-drugres/python-scripts"
 IMAGE="us.gcr.io/broad-dsp-lrma/mad4hatter-drugres-python"

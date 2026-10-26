@@ -9,7 +9,7 @@ IMAGE="us.gcr.io/broad-dsp-lrma/mad4hatter-drugres-python"
 TAG="${1:-$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || date +%Y%m%d-%H%M%S)}"
 
 # Let docker authenticate to Artifact Registry (needs `gcloud auth login` done once)
-gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+#gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
 # Terra runs on linux/amd64, so force that platform (matters on Apple Silicon)
 docker build --platform linux/amd64 \

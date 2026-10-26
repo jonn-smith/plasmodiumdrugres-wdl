@@ -12,11 +12,11 @@ task resmarkers_to_terra {
 
 	command <<<
 		python3 /opt/python-scripts/resmarkers_to_terra.py \
-			--input ~{collapsed_amino_acid_calls} \
-			--output ~{output_tsv_path} \
-			--billing_project ~{billing_project} \
-			--workspace_name ~{workspace_name} \
-			--sample_table ~{sample_table}
+			--input "~{collapsed_amino_acid_calls}" \
+			--output "~{output_tsv_path}" \
+			--billing_project "~{billing_project}" \
+			--workspace_name "~{workspace_name}" \
+			--sample_table "~{sample_table}"
 	>>>
 
 	output {

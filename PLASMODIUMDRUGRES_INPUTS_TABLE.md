@@ -5,8 +5,6 @@
 | **`reference`** | Reference FASTA of insert sequences, one record per `target_name` | `File` | Yes | - |
 | **`loci_of_interest_bed`** | BED of loci of interest; single-locus estimates are computed at these loci | `File` | Yes | - |
 | **`loci_groups`** | TSV/CSV defining multi-locus groups; multi-locus estimates are computed for these groups | `File` | Yes | - |
-| **`billing_project`** | Terra billing project of the workspace whose `sample` table is updated | `String` | Yes | - |
-| **`workspace_name`** | Name of the Terra workspace whose `sample` table is updated | `String` | Yes | - |
 | **`pmo`** | PMO JSON file | `File?` | No | - |
 | **`population_assignment`** | TSV/CSV mapping `specimen_name` to `population`; enables per-population results | `File?` | No | - |
 | **`pmo_population_fields`** | Comma-separated PMO specimen metadata fields used to build the population label; used only when `pmo` is given and `population_assignment` is not | `String?` | No | - |
@@ -20,5 +18,7 @@
 | **`naive_slaf_method`** | Method passed to the naive single-locus estimator | `String` | No | `read_count_prop` |
 | **`translate_loci_extra_args`** | Extra arguments passed to `translate_loci_of_interest` | `String` | No | `""` |
 | **`outdir`** | Output directory name; letters, numbers, `_` and `-` only | `String` | No | `output` |
-| **`workspace_bucket`** | Terra workspace bucket id (e.g. `fc-…`, no `gs://`); set it if automatic `gs://fc-…` detection fails | `String?` | No | - |
+| **`billing_project`** | Terra billing project of the workspace whose `sample` table is updated; detected from the workspace this run was launched from when omitted | `String?` | No | (detected) |
+| **`workspace_name`** | Name of the Terra workspace whose `sample` table is updated; detected from the workspace this run was launched from when omitted | `String?` | No | (detected) |
+| **`workspace_bucket`** | Terra workspace bucket id (e.g. `fc-…`, no `gs://`); set it only if automatic `gs://fc-…` detection and workspace detection both fail | `String?` | No | (detected) |
 | **`docker_image`** | Docker image used by the pipeline tasks | `String` | No | `plasmogenepi/plasmodiumdrugres:wdl` |

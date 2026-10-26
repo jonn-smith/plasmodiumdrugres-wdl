@@ -13,6 +13,7 @@ import "../Tasks/utils/fail.wdl" as fail_t
 import "../Tasks/make_panel_bed/make_panel_bed.wdl" as make_panel_bed
 import "../Tasks/convert_allele_table/convert_allele_table.wdl" as convert_allele_table
 import "../Tasks/resmarkers_to_terra/resmarkers_to_terra.wdl" as resmarkers_to_terra
+import "../Tasks/get_terra_env_info/get_terra_env_info.wdl" as get_terra_env_info_t
 
 workflow plasmodiumdrugres {
    input {
@@ -41,14 +42,17 @@ workflow plasmodiumdrugres {
      String docker_image = "plasmogenepi/plasmodiumdrugres:wdl"
 
      # Optional: Terra workspace bucket id (e.g. fc-… from gs://fc-…/…). Use when Cromwell
-     # localizes File paths and auto-detection from gs:// no longer applies.
+     # localizes File paths and auto-detection from gs:// no longer applies; otherwise it
+     # is detected from the Terra workspace this run is launched from.
      String? workspace_bucket
 
      File amplicon_info
      File reference
 
-     String billing_project
-     String workspace_name
+     # Terra workspace whose `sample` table is updated. Detected from the workspace this
+     # run is launched from when omitted.
+     String? billing_project
+     String? workspace_name
    }
 
    String outdir_sanitized = sub(outdir, "^[A-Za-z0-9_-]+$", "MATCH")
@@ -58,6 +62,18 @@ workflow plasmodiumdrugres {
      call fail_t.fail as outdir_check_fail {
        input:
          message = "ERROR: outdir may only contain letters, numbers, dashes, and underscores."
+     }
+   }
+
+   # Terra workspace identifiers default to the workspace this run was launched from.
+   if (!defined(billing_project) || !defined(workspace_name) || !defined(workspace_bucket)) {
+     call get_terra_env_info_t.get_terra_env_info as t_000_terra_env {}
+
+     if ((!defined(billing_project) || !defined(workspace_name)) && !t_000_terra_env.is_running_on_terra) {
+       call fail_t.fail as terra_env_check_fail {
+         input:
+           message = "ERROR: 'billing_project' and/or 'workspace_name' was not provided, and this run is not on Terra so they cannot be detected. Provide both inputs."
+       }
      }
    }
 
@@ -186,8 +202,11 @@ workflow plasmodiumdrugres {
    String ml_summary_path_str = t_merge_concat.ml_summary
    String inferred_fc_bucket = sub(ml_summary_path_str, "^gs://(fc-[^/]+)/.*$", "$1")
    Boolean fc_inferred_from_gs_uri = inferred_fc_bucket != ml_summary_path_str
-   Boolean move_use_gcs = defined(workspace_bucket) || fc_inferred_from_gs_uri
-   String move_fc_bucket = if defined(workspace_bucket) then select_first([workspace_bucket]) else inferred_fc_bucket
+   String detected_fc_bucket = select_first([t_000_terra_env.bucket_name, ""])
+   Boolean move_use_gcs = defined(workspace_bucket) || fc_inferred_from_gs_uri || detected_fc_bucket != ""
+   String move_fc_bucket = if defined(workspace_bucket) then select_first([workspace_bucket])
+                           else if fc_inferred_from_gs_uri then inferred_fc_bucket
+                           else detected_fc_bucket
 
    call move_outputs_t.move_outputs as t_move_outputs {
      input:
@@ -206,8 +225,8 @@ workflow plasmodiumdrugres {
    call resmarkers_to_terra.resmarkers_to_terra as resmarkers_to_terra {
    input:
       collapsed_amino_acid_calls = t_002_translate_loci.translate_loci_of_interest_output_collapsed_o,
-      billing_project = billing_project,
-      workspace_name = workspace_name
+      billing_project = select_first([billing_project, t_000_terra_env.workspace_namespace]),
+      workspace_name = select_first([workspace_name, t_000_terra_env.workspace_name])
      }
 
    output {

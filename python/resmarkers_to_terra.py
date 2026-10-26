@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """Pivot the collapsed amino acid calls from translate_loci_of_interest into a
-sample-centric table and upsert it into a Terra "sample" data table.
+sample-centric table and upsert it into a Terra data table.
 
 Input  (tab-separated, optionally gzipped): one row per specimen_name/gene/aa_position,
     with at least the columns specimen_name, gene, aa_position, aa
     (e.g. collapsed_amino_acid_calls.tsv.gz).
 Output (tab-separated): one row per specimen_name with the columns
-    sample_id, resmarker_<gene>_<aa_position>, ...
+    <sample_table>_id, resmarker_<gene>_<aa_position>, ...
     where each resmarker column holds the "aa" value for that specimen. If a specimen
     has several different aa values at the same gene/position (a mixed call), the distinct
     values are sorted and joined with "/" (e.g. "F/Y").
 
-The rows are then upserted into the Terra "sample" table. The existing table is NOT
-deleted: rows with matching sample_id are updated, other rows are left alone.
+The rows are then upserted into the Terra table named by --sample_table (default
+"sample"). The existing table is NOT deleted: rows with a matching row id are updated,
+other rows are left alone.
 
 Requires `pyops-service-toolkit` (module name `ops_utils`) for the Terra upload, e.g.:
     pip install git+https://github.com/broadinstitute/pyops-service-toolkit.git
@@ -25,16 +26,11 @@ import logging
 import re
 import sys
 
-from ops_utils.request_util import RunRequest
-from ops_utils.terra_util import TerraWorkspace
-from ops_utils.token_util import Token
-
 logging.basicConfig(format="%(levelname)s: %(asctime)s : %(message)s", level=logging.INFO)
 
 REQUIRED_COLUMNS = ["specimen_name", "gene", "aa_position", "aa"]
 
-SAMPLE_TABLE_NAME = "sample"
-SAMPLE_ID_COLUMN = "sample_id"
+DEFAULT_SAMPLE_TABLE = "sample"
 MIXED_CALL_SEPARATOR = "/"
 
 
@@ -50,6 +46,8 @@ def parse_args(argv=None):
                         help="Terra billing project (required unless --dry_run)")
     parser.add_argument("--workspace_name", "-w",
                         help="Terra workspace name (required unless --dry_run)")
+    parser.add_argument("--sample_table", "-t", default=DEFAULT_SAMPLE_TABLE,
+                        help="Terra data table to upsert into (default: %(default)s)")
     parser.add_argument("--dry_run", action="store_true",
                         help="Write the output TSV but do not upload to Terra")
     args = parser.parse_args(argv)
@@ -71,7 +69,13 @@ def column_name(gene, aa_position):
     return re.sub(r"[^A-Za-z0-9_-]", "_", f"resmarker_{gene}_{aa_position}")
 
 
-def pivot(path):
+def id_column_for(sample_table):
+    """Terra requires a table's row id column to be named <table>_id, and ops_utils
+    rejects the upsert outright when it is not (terra_util.upload_metadata_with_batch_upsert)."""
+    return f"{sample_table}_id"
+
+
+def pivot(path, id_column):
     """Return (rows, columns): one dict per specimen_name, and the sorted resmarker columns."""
     calls = {}  # sample_id -> column -> set of aa values
     columns = set()
@@ -86,21 +90,25 @@ def pivot(path):
             columns.add(column)
             calls.setdefault(sample_id, {}).setdefault(column, set()).add(record["aa"])
     rows = [
-        {SAMPLE_ID_COLUMN: sample_id, **{c: MIXED_CALL_SEPARATOR.join(sorted(v)) for c, v in cols.items()}}
+        {id_column: sample_id, **{c: MIXED_CALL_SEPARATOR.join(sorted(v)) for c, v in cols.items()}}
         for sample_id, cols in calls.items()
     ]
     return rows, sorted(columns)
 
 
-def write_tsv(path, rows, columns):
-    header = [SAMPLE_ID_COLUMN] + columns
+def write_tsv(path, rows, columns, id_column):
+    header = [id_column] + columns
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=header, delimiter="\t", restval="")
         writer.writeheader()
         writer.writerows(rows)
 
 
-def upload_to_terra(rows, billing_project, workspace_name):
+def upload_to_terra(rows, billing_project, workspace_name, sample_table, id_column):
+    from ops_utils.request_util import RunRequest
+    from ops_utils.terra_util import TerraWorkspace
+    from ops_utils.token_util import Token
+
     terra_workspace = TerraWorkspace(
         billing_project=billing_project,
         workspace_name=workspace_name,
@@ -108,11 +116,11 @@ def upload_to_terra(rows, billing_project, workspace_name):
     )
     # Upsert only: the existing table is intentionally left in place. Samples with no
     # call for a column simply don't have that attribute set.
-    logging.info(f"Upserting {len(rows)} rows into Terra table '{SAMPLE_TABLE_NAME}'")
+    logging.info(f"Upserting {len(rows)} rows into Terra table '{sample_table}'")
     terra_workspace.upload_metadata_with_batch_upsert(
         table_data={
-            SAMPLE_TABLE_NAME: {
-                "table_id_column": SAMPLE_ID_COLUMN,
+            sample_table: {
+                "table_id_column": id_column,
                 "row_data": rows,
             }
         }
@@ -122,16 +130,19 @@ def upload_to_terra(rows, billing_project, workspace_name):
 def main(argv=None):
     args = parse_args(argv)
 
-    rows, columns = pivot(args.input)
-    logging.info(f"Pivoted into {len(rows)} sample rows across {len(columns)} resmarker columns")
+    id_column = id_column_for(args.sample_table)
+    rows, columns = pivot(args.input, id_column)
+    logging.info(f"Pivoted into {len(rows)} rows for table '{args.sample_table}' "
+                 f"across {len(columns)} resmarker columns")
 
-    write_tsv(args.output, rows, columns)
+    write_tsv(args.output, rows, columns, id_column)
     logging.info(f"Wrote {args.output}")
 
     if args.dry_run:
         logging.info("Dry run: skipping Terra upload")
         return
-    upload_to_terra(rows, args.billing_project, args.workspace_name)
+    upload_to_terra(rows, args.billing_project, args.workspace_name,
+                    args.sample_table, id_column)
     logging.info("Upload complete.")
 
 

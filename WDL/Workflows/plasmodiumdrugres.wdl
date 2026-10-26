@@ -49,10 +49,14 @@ workflow plasmodiumdrugres {
      File amplicon_info
      File reference
 
-     # Terra workspace whose `sample` table is updated. Detected from the workspace this
+     # Terra workspace whose data table is updated. Detected from the workspace this
      # run is launched from when omitted.
      String? billing_project
      String? workspace_name
+
+     # Terra data table the resmarker columns are written to. Detected from the type of
+     # data this run was launched on (the submission's root entity) when omitted.
+     String? sample_table
    }
 
    String outdir_sanitized = sub(outdir, "^[A-Za-z0-9_-]+$", "MATCH")
@@ -66,13 +70,22 @@ workflow plasmodiumdrugres {
    }
 
    # Terra workspace identifiers default to the workspace this run was launched from.
-   if (!defined(billing_project) || !defined(workspace_name) || !defined(workspace_bucket)) {
+   if (!defined(billing_project) || !defined(workspace_name) || !defined(sample_table) || !defined(workspace_bucket)) {
      call get_terra_env_info_t.get_terra_env_info as t_000_terra_env {}
 
-     if ((!defined(billing_project) || !defined(workspace_name)) && !t_000_terra_env.is_running_on_terra) {
+     if ((!defined(billing_project) || !defined(workspace_name) || !defined(sample_table)) && !t_000_terra_env.is_running_on_terra) {
        call fail_t.fail as terra_env_check_fail {
          input:
-           message = "ERROR: 'billing_project' and/or 'workspace_name' was not provided, and this run is not on Terra so they cannot be detected. Provide both inputs."
+           message = "ERROR: 'billing_project', 'workspace_name' and/or 'sample_table' was not provided, and this run is not on Terra so they cannot be detected. Provide them explicitly."
+       }
+     }
+
+     # The data table is the submission's root entity, so a run launched from file paths
+     # rather than from a data table has nothing to detect.
+     if (!defined(sample_table) && t_000_terra_env.is_running_on_terra && t_000_terra_env.sample_table == "") {
+       call fail_t.fail as sample_table_check_fail {
+         input:
+           message = "ERROR: 'sample_table' was not provided and this submission has no root entity to infer it from (it was most likely launched with inputs defined by file paths rather than from a data table). Provide 'sample_table'."
        }
      }
    }
@@ -226,7 +239,8 @@ workflow plasmodiumdrugres {
    input:
       collapsed_amino_acid_calls = t_002_translate_loci.translate_loci_of_interest_output_collapsed_o,
       billing_project = select_first([billing_project, t_000_terra_env.workspace_namespace]),
-      workspace_name = select_first([workspace_name, t_000_terra_env.workspace_name])
+      workspace_name = select_first([workspace_name, t_000_terra_env.workspace_name]),
+      sample_table = select_first([sample_table, t_000_terra_env.sample_table])
      }
 
    output {

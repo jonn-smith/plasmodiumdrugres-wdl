@@ -20,5 +20,6 @@
 | **`outdir`** | Output directory name; letters, numbers, `_` and `-` only | `String` | No | `output` |
 | **`billing_project`** | Terra billing project of the workspace whose `sample` table is updated; detected from the workspace this run was launched from when omitted | `String?` | No | (detected) |
 | **`workspace_name`** | Name of the Terra workspace whose `sample` table is updated; detected from the workspace this run was launched from when omitted | `String?` | No | (detected) |
+| **`sample_table`** | Terra data table the resmarker columns are written to; detected from the type of data the run was launched on (the submission's root entity) when omitted. The row id column is always `<sample_table>_id` | `String?` | No | (detected) |
 | **`workspace_bucket`** | Terra workspace bucket id (e.g. `fc-…`, no `gs://`); set it only if automatic `gs://fc-…` detection and workspace detection both fail | `String?` | No | (detected) |
 | **`docker_image`** | Docker image used by the pipeline tasks | `String` | No | `plasmogenepi/plasmodiumdrugres:wdl` |

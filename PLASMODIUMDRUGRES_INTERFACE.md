@@ -19,7 +19,7 @@ This document defines the **user-facing inputs and outputs** for the WDL impleme
   `insert_start`, and `insert_end`.) 
 - **`reference`** (`File`): Reference FASTA of insert sequences, one record per target_name
 - **`billing_project`** (`String?`): Terra billing project of the workspace to update (e.g. `my-billing-project`). Used by the final `resmarkers_to_terra` step. Optional: when omitted it is detected from the Terra workspace this run was launched from.
-- **`workspace_name`** (`String?`): Name of the Terra workspace whose `sample` table is updated (the workspace name only, not the `billing_project/workspace_name` pair). Used by the final `resmarkers_to_terra` step. Optional: when omitted it is detected from the Terra workspace this run was launched from.
+- **`workspace_name`** (`String?`): Name of the Terra workspace whose data table is updated (the workspace name only, not the `billing_project/workspace_name` pair). Used by the final `resmarkers_to_terra` step. Optional: when omitted it is detected from the Terra workspace this run was launched from.
 
 ### Required files
 
@@ -96,13 +96,13 @@ Workflow output names (each value is a `gs://…` path to the file):
 - **`loci_covered_by_target_samples_info`** → `loci_covered_by_target_samples_info.tsv`
 - **`loci_of_interest_for_target_for_microhap`** → `loci_of_interest_for_target_for_microhap.tsv.gz`
 
-### Terra `sample` table update
+### Terra data table update
 
-As its last step, the workflow runs the `resmarkers_to_terra` task (`python/resmarkers_to_terra.py`). It takes the collapsed amino acid calls from `translate_loci_of_interest` and pivots them to one row per `specimen_name`, then upserts the rows into the **`sample`** data table of the workspace given by **`billing_project`** / **`workspace_name`** — or, when those are omitted, the workspace the run was launched from.
+As its last step, the workflow runs the `resmarkers_to_terra` task (`python/resmarkers_to_terra.py`). It takes the collapsed amino acid calls from `translate_loci_of_interest` and pivots them to one row per `specimen_name`, then upserts the rows into the data table named by **`sample_table`** in the workspace given by **`billing_project`** / **`workspace_name`** — or, when those are omitted, the table and workspace the run was launched from. `sample_table` is detected from the submission's root entity, so a run launched on a `sample_set` writes to `sample`, and one launched on a `specimen_set` writes to `specimen`.
 
-- **`sample_id`** is the unique `specimen_name` from the collapsed calls.
+- **`<sample_table>_id`** (e.g. `sample_id`) is the unique `specimen_name` from the collapsed calls. Terra requires a table's row id column to be named after the table, so this follows `sample_table` automatically.
 - One column per gene/position is added, named **`resmarker_<gene>_<aa_position>`** (e.g. `resmarker_dhfr-ts_164`), holding the `aa` value. If a specimen has several different `aa` values at the same gene/position (a mixed call), the distinct values are sorted and joined with `/` (e.g. `F/Y`). Specimens with no call at a position have that attribute unset.
-- The existing `sample` table is **not** deleted: rows with a matching `sample_id` are updated and other rows and columns are left unchanged.
+- The existing table is **not** deleted: rows with a matching row id are updated and other rows and columns are left unchanged.
 - This step produces no workflow output; the same table is also written to `sample_resmarkers.tsv` in the task's execution directory.
 
 Per-population merge artifacts and intermediate `translated_loci/` paths are still computed inside the run but are **not** listed as workflow outputs; use the staged URIs above for downloads and downstream tooling.

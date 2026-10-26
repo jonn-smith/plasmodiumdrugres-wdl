@@ -4,7 +4,7 @@ task convert_allele_table {
 	input {
 		File allele_table_tsv
 		String? output_tsv_path = "allele_data_filtered.tsv"
-		String docker_image = "us-central1-docker.pkg.dev/operations-portal-427515/mad4hatter-drugres/python-scripts:latest"
+		String docker_image = "us.gcr.io/broad-dsp-lrma/mad4hatter-drugres-python:latest"
 	}
 
 	command <<<

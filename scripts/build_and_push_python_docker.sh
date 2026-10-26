@@ -4,7 +4,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE="us-central1-docker.pkg.dev/operations-portal-427515/mad4hatter-drugres/python-scripts"
+#IMAGE="us-central1-docker.pkg.dev/operations-portal-427515/mad4hatter-drugres/python-scripts"
+IMAGE="us.gcr.io/broad-dsp-lrma/mad4hatter-drugres-python"
 TAG="${1:-$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || date +%Y%m%d-%H%M%S)}"
 
 # Let docker authenticate to Artifact Registry (needs `gcloud auth login` done once)

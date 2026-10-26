@@ -5,7 +5,7 @@ task make_panel_bed {
 		File amplicon_info_tsv
 		File reference_fasta
 		String? bed_output_path = "Mad4hatter_insert_locs_of_panel.bed"
-		String docker_image = "us-central1-docker.pkg.dev/operations-portal-427515/mad4hatter-drugres/python-scripts:latest"
+		String docker_image = "us.gcr.io/broad-dsp-lrma/mad4hatter-drugres-python:latest"
 	}
 
 	command <<<

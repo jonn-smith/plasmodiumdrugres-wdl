@@ -31,6 +31,44 @@ REAL_TERRA_IDS = {
 }
 
 
+# The three name shapes one sample takes, from the JTS_TEST_COPY_Nairobi workspace:
+#   row id                  UG_TEST_G001_S68
+#   02 output (normalised)  UG_TEST_G001
+#   01 output (raw)         UG_TEST_G001_S68_L001   <- fails without the suffix variants
+NAIROBI_IDS = {"UG_TEST_G001_S68", "UG_TEST_G002_S90", "UG_TEST_G003_S125"}
+
+
+def test_resolve_across_name_shapes():
+    # 01's raw allele table keeps the lane: the regression that broke submission edb7fd30
+    assert r.resolve_terra_ids({"UG_TEST_G001_S68_L001"}, NAIROBI_IDS) == {
+        "UG_TEST_G001_S68_L001": "UG_TEST_G001_S68"}
+
+    # 02's normalised bare name still works (the path that already worked)
+    assert r.resolve_terra_ids({"UG_TEST_G001"}, NAIROBI_IDS) == {
+        "UG_TEST_G001": "UG_TEST_G001_S68"}
+
+    # an id equal to the row id passes straight through
+    assert r.resolve_terra_ids({"UG_TEST_G001_S68"}, NAIROBI_IDS) == {
+        "UG_TEST_G001_S68": "UG_TEST_G001_S68"}
+
+    # all three shapes at once, as an aggregated cohort might present them
+    mixed = {"UG_TEST_G001_S68_L001", "UG_TEST_G002", "UG_TEST_G003_S125"}
+    assert r.resolve_terra_ids(mixed, NAIROBI_IDS) == {
+        "UG_TEST_G001_S68_L001": "UG_TEST_G001_S68",
+        "UG_TEST_G002": "UG_TEST_G002_S90",
+        "UG_TEST_G003_S125": "UG_TEST_G003_S125"}
+
+    # a suffixed name against a bare row id: trim all the way down
+    assert r.resolve_terra_ids({"X_S1_L001"}, {"X"}) == {"X_S1_L001": "X"}
+
+    # SAFETY: a trimmed name must NOT be re-extended onto a different sequencer index.
+    # X_S2_L001 trims to X, and extending X would wrongly match row X_S1.
+    assert r.resolve_terra_ids({"X_S2_L001"}, {"X_S1"}) == {}
+
+    # and the same guard with several indices present
+    assert r.resolve_terra_ids({"X_S9_L001"}, {"X_S1", "X_S2"}) == {}
+
+
 def test_resolve_terra_ids():
     # the regression: a bare specimen_name must resolve onto the suffixed row id
     resolved = r.resolve_terra_ids(
@@ -61,6 +99,7 @@ def test_resolve_terra_ids():
 
 def main():
     test_resolve_terra_ids()
+    test_resolve_across_name_shapes()
 
     # Terra demands the row id column be named <table>_id; ops_utils raises otherwise.
     assert r.id_column_for("sample") == "sample_id"

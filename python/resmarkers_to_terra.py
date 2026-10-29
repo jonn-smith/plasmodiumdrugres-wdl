@@ -80,29 +80,68 @@ def id_column_for(sample_table):
     return f"{sample_table}_id"
 
 
+SEQUENCER_SUFFIX = re.compile(r"_S\d+(_L\d+)?$")
+LANE_SUFFIX = re.compile(r"_L\d+$")
+
+
+def _suffix_variants(name):
+    """The name as given, then with progressively less of its sequencer suffix.
+
+    How much of the sequencer suffix a name carries depends on where it came from.
+    For one sample these are all in play at once:
+
+        UG_TEST_G001            Mad4HatterQcReport output (standardise_sample_name)
+        UG_TEST_G001_S68        the Terra row id
+        UG_TEST_G001_S68_L001   Mad4Hatter's own allele table, used when QC is skipped
+
+    So try the name unchanged, then without the lane, then without the whole suffix.
+    """
+    variants = []
+    for candidate in (name, LANE_SUFFIX.sub("", name), SEQUENCER_SUFFIX.sub("", name)):
+        if candidate and candidate not in variants:
+            variants.append(candidate)
+    return variants
+
+
+def _match(candidate, terra_ids, may_extend):
+    """(row_id, ambiguous) for one candidate form of a specimen name.
+
+    may_extend allows matching a row id that is the candidate PLUS a sequencer suffix,
+    which is how a QC-normalised bare name finds its suffixed row. It is only safe for
+    the name as given: extending an already-trimmed name would let 'X_S2_L001' trim to
+    'X' and then match row 'X_S1', i.e. the wrong sample.
+    """
+    if candidate in terra_ids:
+        return candidate, []
+    if not may_extend:
+        return None, []
+    pattern = re.compile(rf"^{re.escape(candidate)}_S\d+(_L\d+)?$")
+    matches = sorted(terra_id for terra_id in terra_ids if pattern.match(terra_id))
+    if len(matches) == 1:
+        return matches[0], []
+    return None, matches
+
+
 def resolve_terra_ids(specimen_names, terra_ids):
     """specimen_name -> the row id that already exists in the Terra table.
 
-    Terra row ids often carry a sequencer suffix (e.g. 'SRR26819135_S1_L001') that the
-    pipeline's specimen_name lacks. A name matches an id that equals it exactly, or that
-    is the name followed by '_S<digits>', optionally followed by '_L<digits>'. Names with
-    no match, or with more than one, are skipped and reported rather than guessed at, so
-    we never upsert a stray row next to the real one.
+    Names with no match, or with more than one, are skipped and reported rather than
+    guessed at, so we never upsert a stray row next to the real one.
 
     Ported from mad4hatter-wdl bin/write_metrics_to_sample_table.py, which solved this
     same mismatch for the QC metrics.
     """
     resolved = {}
     for name in sorted(specimen_names):
-        if name in terra_ids:
-            resolved[name] = name
-            continue
-        pattern = re.compile(rf"^{re.escape(name)}_S\d+(_L\d+)?$")
-        matches = sorted(terra_id for terra_id in terra_ids if pattern.match(terra_id))
-        if len(matches) == 1:
-            resolved[name] = matches[0]
-        elif matches:
-            logging.warning(f"'{name}' matches multiple Terra ids ({', '.join(matches)}); skipping.")
+        row_id, ambiguous = None, []
+        for index, candidate in enumerate(_suffix_variants(name)):
+            row_id, ambiguous = _match(candidate, terra_ids, may_extend=(index == 0))
+            if row_id or ambiguous:
+                break
+        if row_id:
+            resolved[name] = row_id
+        elif ambiguous:
+            logging.warning(f"'{name}' matches multiple Terra ids ({', '.join(ambiguous)}); skipping.")
         else:
             logging.warning(f"no Terra id found for '{name}'; skipping.")
     return resolved

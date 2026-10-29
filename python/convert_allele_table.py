@@ -5,6 +5,14 @@ into the specimen/target/reads/seq TSV layout.
 Input  (tab-separated): sample_name, target_name, reads, <seq column>, ...
 Output (tab-separated): specimen_name, target_name, reads, seq
 
+sample_name is normalised by stripping the sequencer suffix ("_S12", "_S12_L001"), the
+same transformation Mad4HatterQcReport applies via standardise_sample_name. Everything
+downstream of this script joins on specimen_name -- the population map, the Terra
+row-id resolution in resmarkers_to_terra.py -- and those references use the bare name.
+Without this, the pipeline only works on the QC report's output and breaks on
+Mad4Hatter's own allele table, which keeps the full suffix. Pass
+--keep-sequencer-suffix to leave the name exactly as given.
+
 Columns are renamed as below, reordered, and all other columns are dropped.
 Values are copied through unchanged.
 
@@ -17,7 +25,12 @@ Only the Python standard library is used.
 
 import argparse
 import csv
+import re
 import sys
+
+
+# Matches Mad4HatterQcReport's standardise_sample_name: "_S12" or "_S12_L001".
+SEQUENCER_SUFFIX = re.compile(r"_S\d+(_L\d+)?$")
 
 
 def parse_args(argv=None):
@@ -27,6 +40,9 @@ def parse_args(argv=None):
     parser.add_argument("--input", required=True,
                         help="Tab-separated allele table (sample_name, target_name, reads, asv, ...)")
     parser.add_argument("--output", required=True, help="Output TSV path")
+    parser.add_argument("--keep-sequencer-suffix", action="store_true",
+                        help="Leave sample_name untouched instead of stripping a trailing "
+                             "_S<digits> or _S<digits>_L<digits>")
     parser.add_argument("--seq-column", default="asv",
                         help="Input column to write as seq (default: asv, the unmasked sequence)")
     return parser.parse_args(argv)
@@ -52,7 +68,10 @@ def main(argv=None):
             writer.writerow([dst for dst, _ in column_map])
             n = 0
             for row in reader:
-                writer.writerow([row[src] for _, src in column_map])
+                values = [row[src] for _, src in column_map]
+                if not args.keep_sequencer_suffix:
+                    values[0] = SEQUENCER_SUFFIX.sub("", values[0])
+                writer.writerow(values)
                 n += 1
     print(f"Wrote {n} rows to {args.output}", file=sys.stderr)
 

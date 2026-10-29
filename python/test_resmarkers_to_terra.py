@@ -97,9 +97,29 @@ def test_resolve_terra_ids():
     assert r.resolve_terra_ids({"SRR26819135"}, {"SRR26819135_extra"}) == {}
 
 
+def test_converter_normalisation_feeds_the_resolver():
+    """convert_allele_table strips the sequencer suffix; the resolver extends it back.
+
+    These two have to agree or a no-QC run breaks: Mad4Hatter's allele table carries
+    UG_TEST_G001_S68_L001, the Terra row is UG_TEST_G001_S68.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "cat", os.path.join(os.path.dirname(os.path.abspath(__file__)), "convert_allele_table.py"))
+    cat = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cat)
+
+    for raw in ("UG_TEST_G001_S68_L001", "UG_TEST_G001_S68", "UG_TEST_G001"):
+        bare = cat.SEQUENCER_SUFFIX.sub("", raw)
+        assert bare == "UG_TEST_G001", (raw, bare)
+        assert r.resolve_terra_ids({bare}, {"UG_TEST_G001_S68"}) == {
+            "UG_TEST_G001": "UG_TEST_G001_S68"}, raw
+
+
 def main():
     test_resolve_terra_ids()
     test_resolve_across_name_shapes()
+    test_converter_normalisation_feeds_the_resolver()
 
     # Terra demands the row id column be named <table>_id; ops_utils raises otherwise.
     assert r.id_column_for("sample") == "sample_id"
